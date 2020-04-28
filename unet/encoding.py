@@ -7,10 +7,9 @@ class Encoder(nn.Module):
     def __init__(
             self,
             in_channels: int,
-            out_channels_first: int,
+            out_channel_lists: list,
             dimensions: int,
             pooling_type: str,
-            num_encoding_blocks: int,
             normalization: Optional[str],
             preactivation: bool = False,
             residual: bool = False,
@@ -25,10 +24,10 @@ class Encoder(nn.Module):
         self.encoding_blocks = nn.ModuleList()
         self.dilation = initial_dilation
         is_first_block = True
-        for _ in range(num_encoding_blocks):
+        for out_channel_list in out_channel_lists:
             encoding_block = EncodingBlock(
                 in_channels,
-                out_channels_first,
+                out_channel_list,
                 dimensions,
                 normalization,
                 pooling_type,
@@ -43,12 +42,7 @@ class Encoder(nn.Module):
             )
             is_first_block = False
             self.encoding_blocks.append(encoding_block)
-            if dimensions == 2:
-                in_channels = out_channels_first
-                out_channels_first = in_channels * 2
-            elif dimensions == 3:
-                in_channels = 2 * out_channels_first
-                out_channels_first = in_channels
+            in_channels = out_channel_list[-1]
             if self.dilation is not None:
                 self.dilation *= 2
 
@@ -68,7 +62,7 @@ class EncodingBlock(nn.Module):
     def __init__(
             self,
             in_channels: int,
-            out_channels_first: int,
+            out_channel_list: list,
             dimensions: int,
             normalization: Optional[str],
             pooling_type: Optional[str],
@@ -95,40 +89,30 @@ class EncodingBlock(nn.Module):
             normalization = self.normalization
             preactivation = self.preactivation
 
-        self.conv1 = ConvolutionalBlock(
-            dimensions,
-            in_channels,
-            out_channels_first,
-            normalization=normalization,
-            preactivation=preactivation,
-            padding=padding,
-            padding_mode=padding_mode,
-            activation=activation,
-            dilation=dilation,
-            dropout=dropout,
-        )
-
-        if dimensions == 2:
-            out_channels_second = out_channels_first
-        elif dimensions == 3:
-            out_channels_second = 2 * out_channels_first
-        self.conv2 = ConvolutionalBlock(
-            dimensions,
-            out_channels_first,
-            out_channels_second,
-            normalization=self.normalization,
-            preactivation=self.preactivation,
-            padding=padding,
-            activation=activation,
-            dilation=dilation,
-            dropout=dropout,
-        )
+        conv_layers = nn.ModuleList()
+        for out_channels in out_channel_list:
+            conv_layers.append(ConvolutionalBlock(
+                dimensions,
+                in_channels,
+                out_channels,
+                normalization=normalization,
+                preactivation=preactivation,
+                padding=padding,
+                padding_mode=padding_mode,
+                activation=activation,
+                dilation=dilation,
+                dropout=dropout,
+            ))
+            preactivation = self.preactivation
+            normalization = self.normalization
+            in_channels = out_channels
+        self.conv_layers = nn.Sequential(*conv_layers)
 
         if residual:
             self.conv_residual = ConvolutionalBlock(
                 dimensions,
                 in_channels,
-                out_channels_second,
+                out_channel_list[-1],
                 kernel_size=1,
                 normalization=None,
                 activation=None,
@@ -141,12 +125,10 @@ class EncodingBlock(nn.Module):
     def forward(self, x):
         if self.residual:
             connection = self.conv_residual(x)
-            x = self.conv1(x)
-            x = self.conv2(x)
+            x = self.conv_layers(x)
             x += connection
         else:
-            x = self.conv1(x)
-            x = self.conv2(x)
+            x = self.conv_layers(x)
         if self.downsample is None:
             return x
         else:
@@ -156,7 +138,7 @@ class EncodingBlock(nn.Module):
 
     @property
     def out_channels(self):
-        return self.conv2.conv_layer.out_channels
+        return self.conv_layers[-1].out_channels
 
 
 def get_downsampling_layer(

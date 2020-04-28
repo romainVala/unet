@@ -19,10 +19,11 @@ UPSAMPLING_MODES = (
 class Decoder(nn.Module):
     def __init__(
             self,
-            in_channels_skip_connection: int,
+            in_channels: int,
+            out_channel_lists: list,
+            target_channel_list: list,
             dimensions: int,
             upsampling_type: str,
-            num_decoding_blocks: int,
             normalization: Optional[str],
             preactivation: bool = False,
             residual: bool = False,
@@ -36,9 +37,13 @@ class Decoder(nn.Module):
         upsampling_type = fix_upsampling_type(upsampling_type, dimensions)
         self.decoding_blocks = nn.ModuleList()
         self.dilation = initial_dilation
-        for _ in range(num_decoding_blocks):
+        for target_channels, out_channel_list in zip(
+            reversed(target_channel_list), reversed(out_channel_lists)
+        ):
             decoding_block = DecodingBlock(
-                in_channels_skip_connection,
+                in_channels,
+                list(reversed(out_channel_list)),
+                target_channels,
                 dimensions,
                 upsampling_type,
                 normalization=normalization,
@@ -50,8 +55,8 @@ class Decoder(nn.Module):
                 dilation=self.dilation,
                 dropout=dropout,
             )
+            in_channels = target_channels
             self.decoding_blocks.append(decoding_block)
-            in_channels_skip_connection //= 2
             if self.dilation is not None:
                 self.dilation //= 2
 
@@ -65,7 +70,9 @@ class Decoder(nn.Module):
 class DecodingBlock(nn.Module):
     def __init__(
             self,
-            in_channels_skip_connection: int,
+            in_channels: int,
+            out_channel_list: list,
+            target_channels: int,
             dimensions: int,
             upsampling_type: str,
             normalization: Optional[str],
@@ -78,65 +85,53 @@ class DecodingBlock(nn.Module):
             dropout: float = 0,
             ):
         super().__init__()
-
         self.residual = residual
 
         if upsampling_type == 'conv':
-            in_channels = out_channels = 2 * in_channels_skip_connection
             self.upsample = get_conv_transpose_layer(
-                dimensions, in_channels, out_channels)
+                dimensions, in_channels, in_channels)
         else:
             self.upsample = get_upsampling_layer(upsampling_type)
-        in_channels_first = in_channels_skip_connection * (1 + 2)
-        out_channels = in_channels_skip_connection
-        self.conv1 = ConvolutionalBlock(
-            dimensions,
-            in_channels_first,
-            out_channels,
-            normalization=normalization,
-            preactivation=preactivation,
-            padding=padding,
-            padding_mode=padding_mode,
-            activation=activation,
-            dilation=dilation,
-            dropout=dropout,
-        )
-        in_channels_second = out_channels
-        self.conv2 = ConvolutionalBlock(
-            dimensions,
-            in_channels_second,
-            out_channels,
-            normalization=normalization,
-            preactivation=preactivation,
-            padding=padding,
-            padding_mode=padding_mode,
-            activation=activation,
-            dilation=dilation,
-            dropout=dropout,
-        )
+        in_channels = in_channels + target_channels
 
         if residual:
             self.conv_residual = ConvolutionalBlock(
                 dimensions,
-                in_channels_first,
-                out_channels,
+                in_channels,
+                out_channel_list[-1],
                 kernel_size=1,
                 normalization=None,
                 activation=None,
             )
 
+        conv_layers = nn.ModuleList()
+        for out_channels in out_channel_list[1:] + [target_channels]:
+            conv_layers.append(ConvolutionalBlock(
+                dimensions,
+                in_channels,
+                out_channels,
+                normalization=normalization,
+                preactivation=preactivation,
+                padding=padding,
+                padding_mode=padding_mode,
+                activation=activation,
+                dilation=dilation,
+                dropout=dropout,
+            ))
+            in_channels = out_channels
+
+        self.conv_layers = nn.Sequential(*conv_layers)
+
     def forward(self, skip_connection, x):
         x = self.upsample(x)
-        skip_connection = self.center_crop(skip_connection, x)
+        x = self.center_crop(skip_connection, x)
         x = torch.cat((skip_connection, x), dim=CHANNELS_DIMENSION)
         if self.residual:
             connection = self.conv_residual(x)
-            x = self.conv1(x)
-            x = self.conv2(x)
+            x = self.conv_layers(x)
             x += connection
         else:
-            x = self.conv1(x)
-            x = self.conv2(x)
+            x = self.conv_layers(x)
         return x
 
     def center_crop(self, skip_connection, x):
@@ -144,11 +139,12 @@ class DecodingBlock(nn.Module):
         x_shape = torch.tensor(x.shape)
         crop = skip_shape[2:] - x_shape[2:]
         half_crop = crop // 2
+        additional_crop = crop % 2
         # If skip_connection is 10, 20, 30 and x is (6, 14, 12)
         # Then pad will be (-2, -2, -3, -3, -9, -9)
-        pad = -torch.stack((half_crop, half_crop)).t().flatten()
-        skip_connection = F.pad(skip_connection, pad.tolist())
-        return skip_connection
+        pad = torch.stack((half_crop, half_crop + additional_crop)).t().flatten()
+        x = F.pad(x, pad.tolist())
+        return x
 
 
 def get_upsampling_layer(upsampling_type: str) -> nn.Upsample:
