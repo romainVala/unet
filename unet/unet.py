@@ -19,7 +19,8 @@ class UNet(nn.Module):
             dimensions: int = 2,
             num_encoding_blocks: int = 5,
             out_channels_first_layer: int = 64,
-            out_channel_lists: list = None,
+            encoder_out_channel_lists: list = None,
+            decoder_out_channel_lists: list = None,
             normalization: Optional[str] = None,
             pooling_type: str = 'max',
             upsampling_type: str = 'conv',
@@ -34,18 +35,32 @@ class UNet(nn.Module):
             ):
         super().__init__()
 
-        if out_channel_lists is None:
-            out_channel_lists = []
+        if encoder_out_channel_lists is None:
+            encoder_out_channel_lists = []
             for _ in range(num_encoding_blocks):
                 if dimensions == 2:
                     out_channels_second_layer = out_channels_first_layer
                 else:
                     out_channels_second_layer = 2 * out_channels_first_layer
-                out_channel_lists.append([out_channels_first_layer, out_channels_second_layer])
+                encoder_out_channel_lists.append([out_channels_first_layer, out_channels_second_layer])
                 out_channels_first_layer *= 2
         else:
-            if num_encoding_blocks != len(out_channel_lists):
+            if num_encoding_blocks != len(encoder_out_channel_lists):
                 raise ValueError('Number of encoding blocks and length of output channels\' list do not match.')
+
+        skip_connection_channel_list = [out_channel_list[-1] for out_channel_list in encoder_out_channel_lists[:-1]][::-1]
+
+        if decoder_out_channel_lists is None:
+            decoder_out_channel_lists = []
+            for i, out_channel_list in enumerate(encoder_out_channel_lists[:-1]):
+                decoder_out_channel_lists.append(
+                    list(reversed(encoder_out_channel_lists[i+1]))[1:] + [out_channel_list[-1]]
+                )
+                decoder_out_channel_lists.reverse()
+
+        else:
+            if num_encoding_blocks - 1 != len(decoder_out_channel_lists):
+                raise ValueError('Number of decoding block and length of output channels\' list do not match.')
 
         # Force padding if residual blocks
         if residual:
@@ -54,7 +69,7 @@ class UNet(nn.Module):
         # Encoder
         self.encoder = Encoder(
             in_channels,
-            out_channel_lists[:-1],
+            encoder_out_channel_lists[:-1],
             dimensions,
             pooling_type,
             normalization,
@@ -72,7 +87,7 @@ class UNet(nn.Module):
 
         self.bottom_block = EncodingBlock(
             in_channels,
-            out_channel_lists[-1],
+            encoder_out_channel_lists[-1],
             dimensions,
             normalization,
             pooling_type=None,
@@ -87,12 +102,11 @@ class UNet(nn.Module):
 
         # Decoder
         in_channels = self.bottom_block.out_channels
-        target_channel_list = [block.out_channels for block in self.encoder.encoding_blocks]
 
         self.decoder = Decoder(
             in_channels,
-            out_channel_lists[1:],
-            target_channel_list,
+            decoder_out_channel_lists,
+            skip_connection_channel_list,
             dimensions,
             upsampling_type,
             normalization=normalization,
@@ -112,7 +126,7 @@ class UNet(nn.Module):
             self.monte_carlo_layer = dropout_class(p=monte_carlo_dropout)
 
         # Classifier
-        in_channels = out_channel_lists[0][-1]
+        in_channels = decoder_out_channel_lists[-1][-1]
         self.classifier = ConvolutionalBlock(
             dimensions, in_channels, out_classes,
             kernel_size=1, activation=None,

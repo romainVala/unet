@@ -21,7 +21,7 @@ class Decoder(nn.Module):
             self,
             in_channels: int,
             out_channel_lists: list,
-            target_channel_list: list,
+            skip_connection_channel_list: list,
             dimensions: int,
             upsampling_type: str,
             normalization: Optional[str],
@@ -37,13 +37,11 @@ class Decoder(nn.Module):
         upsampling_type = fix_upsampling_type(upsampling_type, dimensions)
         self.decoding_blocks = nn.ModuleList()
         self.dilation = initial_dilation
-        for target_channels, out_channel_list in zip(
-            reversed(target_channel_list), reversed(out_channel_lists)
-        ):
+        for skip_connection_channels, out_channel_list in zip(skip_connection_channel_list, out_channel_lists):
             decoding_block = DecodingBlock(
                 in_channels,
-                list(reversed(out_channel_list)),
-                target_channels,
+                out_channel_list,
+                skip_connection_channels,
                 dimensions,
                 upsampling_type,
                 normalization=normalization,
@@ -55,7 +53,7 @@ class Decoder(nn.Module):
                 dilation=self.dilation,
                 dropout=dropout,
             )
-            in_channels = target_channels
+            in_channels = out_channel_list[-1]
             self.decoding_blocks.append(decoding_block)
             if self.dilation is not None:
                 self.dilation //= 2
@@ -72,7 +70,7 @@ class DecodingBlock(nn.Module):
             self,
             in_channels: int,
             out_channel_list: list,
-            target_channels: int,
+            skip_connection_channels: int,
             dimensions: int,
             upsampling_type: str,
             normalization: Optional[str],
@@ -92,7 +90,7 @@ class DecodingBlock(nn.Module):
                 dimensions, in_channels, in_channels)
         else:
             self.upsample = get_upsampling_layer(upsampling_type)
-        in_channels = in_channels + target_channels
+        in_channels = in_channels + skip_connection_channels
 
         if residual:
             self.conv_residual = ConvolutionalBlock(
@@ -105,7 +103,7 @@ class DecodingBlock(nn.Module):
             )
 
         conv_layers = nn.ModuleList()
-        for out_channels in out_channel_list[1:] + [target_channels]:
+        for out_channels in out_channel_list:
             conv_layers.append(ConvolutionalBlock(
                 dimensions,
                 in_channels,
