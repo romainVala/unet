@@ -19,6 +19,7 @@ class ConvolutionalBlock(nn.Module):
             dropout: float = 0,
             ):
         super().__init__()
+        self.out_channels = out_channels
 
         block = nn.ModuleList()
 
@@ -59,17 +60,11 @@ class ConvolutionalBlock(nn.Module):
             self.add_if_not_none(block, norm_layer)
             self.add_if_not_none(block, activation_layer)
 
-        dropout_layer = None
         if dropout:
             class_name = 'Dropout{}d'.format(dimensions)
             dropout_class = getattr(nn, class_name)
             dropout_layer = dropout_class(p=dropout)
             self.add_if_not_none(block, dropout_layer)
-
-        self.conv_layer = conv_layer
-        self.norm_layer = norm_layer
-        self.activation_layer = activation_layer
-        self.dropout_layer = dropout_layer
 
         self.block = nn.Sequential(*block)
 
