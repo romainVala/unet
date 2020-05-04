@@ -7,11 +7,12 @@ import torch.nn as nn
 from .encoding import Encoder, EncodingBlock
 from .decoding import Decoder
 from .conv import ConvolutionalBlock
+from .base_net import BaseNet, clean_locals
 
 __all__ = ['UNet', 'UNet2D', 'UNet3D']
 
 
-class UNet(nn.Module):
+class UNet(BaseNet):
     def __init__(
             self,
             in_channels: int = 1,
@@ -33,7 +34,7 @@ class UNet(nn.Module):
             dropout: float = 0,
             monte_carlo_dropout: float = 0,
             ):
-        super().__init__()
+        super().__init__(**clean_locals(**locals()))
 
         if encoder_out_channel_lists is None:
             encoder_out_channel_lists = []
