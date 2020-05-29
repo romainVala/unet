@@ -89,6 +89,16 @@ class EncodingBlock(nn.Module):
             normalization = self.normalization
             preactivation = self.preactivation
 
+        if residual:
+            self.conv_residual = ConvolutionalBlock(
+                dimensions,
+                in_channels,
+                out_channel_list[-1],
+                kernel_size=1,
+                normalization=None,
+                activation=None,
+            )
+
         conv_layers = nn.ModuleList()
         for out_channels in out_channel_list:
             conv_layers.append(ConvolutionalBlock(
@@ -107,16 +117,6 @@ class EncodingBlock(nn.Module):
             normalization = self.normalization
             in_channels = out_channels
         self.conv_layers = nn.Sequential(*conv_layers)
-
-        if residual:
-            self.conv_residual = ConvolutionalBlock(
-                dimensions,
-                in_channels,
-                out_channel_list[-1],
-                kernel_size=1,
-                normalization=None,
-                activation=None,
-            )
 
         self.downsample = None
         if pooling_type is not None:
