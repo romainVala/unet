@@ -16,13 +16,13 @@ class Encoder(nn.Module):
             padding: int = 0,
             padding_mode: str = 'zeros',
             activation: Optional[str] = 'ReLU',
-            initial_dilation: Optional[int] = None,
+            dilation: Optional[int] = None,
             dropout: float = 0,
             ):
         super().__init__()
 
         self.encoding_blocks = nn.ModuleList()
-        self.dilation = initial_dilation
+        self.dilation = dilation
         is_first_block = True
         for out_channel_list in out_channel_lists:
             encoding_block = EncodingBlock(
@@ -43,8 +43,8 @@ class Encoder(nn.Module):
             is_first_block = False
             self.encoding_blocks.append(encoding_block)
             in_channels = out_channel_list[-1]
-            if self.dilation is not None:
-                self.dilation *= 2
+            # if self.dilation is not None:
+            #     self.dilation *= 2
 
     def forward(self, x):
         skip_connections = []

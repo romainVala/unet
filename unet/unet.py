@@ -30,7 +30,7 @@ class UNet(BaseNet):
             padding: int = 0,
             padding_mode: str = 'zeros',
             activation: Optional[str] = 'ReLU',
-            initial_dilation: Optional[int] = None,
+            dilation: Optional[int] = None,
             dropout: float = 0,
             monte_carlo_dropout: float = 0,
             ):
@@ -79,7 +79,7 @@ class UNet(BaseNet):
             padding=padding,
             padding_mode=padding_mode,
             activation=activation,
-            initial_dilation=initial_dilation,
+            dilation=dilation,
             dropout=dropout,
         )
 
@@ -116,7 +116,7 @@ class UNet(BaseNet):
             padding=padding,
             padding_mode=padding_mode,
             activation=activation,
-            initial_dilation=self.encoder.dilation,
+            dilation=self.encoder.dilation,
             dropout=dropout,
         )
 
