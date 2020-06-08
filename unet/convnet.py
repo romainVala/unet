@@ -26,7 +26,8 @@ class ConvNet(BaseNet):
             padding_mode: str = 'zeros',
             activation: Optional[str] = 'ReLU',
             dilation: Optional[int] = None,
-            dropout: float = 0,
+            conv_dropout: float = 0,
+            lin_dropout: float = 0,
             monte_carlo_dropout: float = 0,
             final_activation: Optional[str] = None,
     ):
@@ -69,7 +70,7 @@ class ConvNet(BaseNet):
             padding_mode=padding_mode,
             activation=activation,
             dilation=dilation,
-            dropout=dropout,
+            dropout=conv_dropout,
         )
 
         # Monte Carlo dropout
@@ -87,7 +88,7 @@ class ConvNet(BaseNet):
             normalization,
             preactivation=preactivation,
             activation=activation,
-            dropout=dropout,
+            dropout=lin_dropout,
         )
 
         if final_activation is not None:
