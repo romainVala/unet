@@ -18,7 +18,8 @@ class ConvNet(BaseNet):
             out_channels_first_layer: int = 64,
             encoder_out_channel_lists: list = None,
             linear_out_size_list: list = None,
-            normalization: Optional[str] = None,
+            conv_normalization: Optional[str] = None,
+            lin_normalization: Optional[str] = None,
             pooling_type: str = 'max',
             preactivation: bool = False,
             residual: bool = False,
@@ -26,7 +27,8 @@ class ConvNet(BaseNet):
             padding_mode: str = 'zeros',
             activation: Optional[str] = 'ReLU',
             dilation: Optional[int] = None,
-            dropout: float = 0,
+            conv_dropout: float = 0,
+            lin_dropout: float = 0,
             monte_carlo_dropout: float = 0,
             final_activation: Optional[str] = None,
     ):
@@ -62,14 +64,14 @@ class ConvNet(BaseNet):
             encoder_out_channel_lists,
             dimensions,
             pooling_type,
-            normalization,
+            conv_normalization,
             preactivation=preactivation,
             residual=residual,
             padding=padding,
             padding_mode=padding_mode,
             activation=activation,
             dilation=dilation,
-            dropout=dropout,
+            dropout=conv_dropout,
         )
 
         # Monte Carlo dropout
@@ -84,10 +86,10 @@ class ConvNet(BaseNet):
         self.dense = DenseNet(
             linear_in_size,
             linear_out_size_list,
-            normalization,
+            lin_normalization,
             preactivation=preactivation,
             activation=activation,
-            dropout=dropout,
+            dropout=lin_dropout,
         )
 
         if final_activation is not None:

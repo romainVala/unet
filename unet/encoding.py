@@ -24,7 +24,9 @@ class Encoder(nn.Module):
         self.encoding_blocks = nn.ModuleList()
         self.dilation = dilation
         is_first_block = True
-        for out_channel_list in out_channel_lists:
+        for index, out_channel_list in enumerate(out_channel_lists):
+            the_drop_out = dropout[index] if isinstance(dropout,list) else dropout
+
             encoding_block = EncodingBlock(
                 in_channels,
                 out_channel_list,
@@ -38,7 +40,7 @@ class Encoder(nn.Module):
                 padding_mode=padding_mode,
                 activation=activation,
                 dilation=self.dilation,
-                dropout=dropout,
+                dropout=the_drop_out,
             )
             is_first_block = False
             self.encoding_blocks.append(encoding_block)
