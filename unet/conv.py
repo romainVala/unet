@@ -24,9 +24,11 @@ class ConvolutionalBlock(nn.Module):
         block = nn.ModuleList()
 
         dilation = 1 if dilation is None else dilation
-        if padding:
-            total_padding = kernel_size + 2 * (dilation - 1) - 1
-            padding = total_padding // 2
+        # if padding:  #this is if you want same_padding, but now it is the user to chose the good one
+        #     total_padding = kernel_size + 2 * (dilation - 1) - 1
+        #     padding = total_padding // 2
+
+        #print('Conv layer with padd {} dill {} kernel {}'.format(padding, dilation, kernel_size))
 
         class_name = 'Conv{}d'.format(dimensions)
         conv_class = getattr(nn, class_name)

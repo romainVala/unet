@@ -5,6 +5,7 @@ from .encoding import Encoder
 from .base_net import BaseNet, clean_locals
 from .dense import DenseNet
 
+__all__ = ['ConvNet']
 
 class ConvNet(BaseNet):
     def __init__(
@@ -24,7 +25,7 @@ class ConvNet(BaseNet):
             padding: int = 0,
             padding_mode: str = 'zeros',
             activation: Optional[str] = 'ReLU',
-            initial_dilation: Optional[int] = None,
+            dilation: Optional[int] = None,
             dropout: float = 0,
             monte_carlo_dropout: float = 0,
             final_activation: Optional[str] = None,
@@ -40,9 +41,9 @@ class ConvNet(BaseNet):
                     out_channels_second_layer = 2 * out_channels_first_layer
                 encoder_out_channel_lists.append([out_channels_first_layer, out_channels_second_layer])
                 out_channels_first_layer *= 2
-        else:
-            if num_encoding_blocks != len(encoder_out_channel_lists):
-                raise ValueError('Number of encoding blocks and length of output channels\' list do not match.')
+        # else:
+        #     if num_encoding_blocks != len(encoder_out_channel_lists):
+        #         raise ValueError('Number of encoding blocks and length of output channels\' list do not match.')
 
         if linear_out_size_list is None:
             linear_out_size_list = []
@@ -52,6 +53,8 @@ class ConvNet(BaseNet):
         # Force padding if residual blocks
         if residual:
             padding = 1
+
+        self.final_activation_layer = final_activation
 
         # Encoder
         self.encoder = Encoder(
@@ -65,7 +68,7 @@ class ConvNet(BaseNet):
             padding=padding,
             padding_mode=padding_mode,
             activation=activation,
-            initial_dilation=initial_dilation,
+            dilation=dilation,
             dropout=dropout,
         )
 
@@ -76,7 +79,7 @@ class ConvNet(BaseNet):
             self.monte_carlo_layer = dropout_class(p=monte_carlo_dropout)
 
         # Fully connected layers
-        linear_in_size = self.get_linear_in_size(in_size, encoder_out_channel_lists, padding)
+        linear_in_size = self.get_linear_in_size(in_size, encoder_out_channel_lists, padding, dilation)
 
         self.dense = DenseNet(
             linear_in_size,
@@ -100,8 +103,12 @@ class ConvNet(BaseNet):
         return x
 
     @staticmethod
-    def get_linear_in_size(in_size, conv_lists, padding):
-        size_reduction = 2 * (1 - padding)
+    def get_linear_in_size(in_size, conv_lists, padding, dilation, kernel_size=3):
+        stride = 1
+        size_reduction = (-2 * padding + kernel_size + (kernel_size-1) * (dilation-1) ) // stride - 1
+
+        #[i + 2 * p - k - (k - 1) * (d - 1)] / s + 1
+
         for convs in conv_lists:
             in_size = tuple(map(lambda s: (s - len(convs) * size_reduction) // 2, in_size))
         return np.product(in_size) * conv_lists[-1][-1]
