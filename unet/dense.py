@@ -66,7 +66,11 @@ class DenseNet(nn.Module):
         super().__init__()
 
         fc_blocks = nn.ModuleList()
-        for out_size in out_size_list:
+        nb_lin = len(out_size_list)
+
+        for ii, out_size in enumerate(out_size_list,1):
+            if ii==nb_lin:
+                activation=None
             fc_block = FullyConnectedBlock(
                 in_size,
                 out_size,
