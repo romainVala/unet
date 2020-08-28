@@ -10,7 +10,7 @@ __all__ = ['ConvNet']
 class ConvNet(BaseNet):
     def __init__(
             self,
-            in_size: tuple,
+            in_size: tuple = None,
             in_channels: int = 1,
             out_classes: int = 2,
             dimensions: int = 2,
@@ -33,6 +33,8 @@ class ConvNet(BaseNet):
             final_activation: Optional[str] = None,
     ):
         super().__init__(**clean_locals(**locals()))
+        if in_size==None:
+            return #for empty initialisation, when ones want to use the load
 
         if encoder_out_channel_lists is None:
             encoder_out_channel_lists = []
