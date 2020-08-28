@@ -31,9 +31,12 @@ class UNet(BaseNet):
             padding_mode: str = 'zeros',
             activation: Optional[str] = 'ReLU',
             dilation: Optional[int] = None,
+            initial_dilation: Optional[int] = None, #added for backward compatibility of saved model
             dropout: float = 0,
             monte_carlo_dropout: float = 0,
             ):
+        if initial_dilation is not None:
+            dilation = initial_dilation #old param name was initial_dilation and now dilation
         super().__init__(**clean_locals(**locals()))
 
         if encoder_out_channel_lists is None:
