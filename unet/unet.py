@@ -144,6 +144,21 @@ class UNet(BaseNet):
             x = self.monte_carlo_layer(x)
         return self.classifier(x)
 
+    def enable_dropout(self):
+
+        for m in self.encoder.modules():
+            if m.__class__.__name__.startswith('Dropout'):
+                m.train()
+                #print('layer CONV {} is in train'.format(m.__class__.__name__))
+        for m in self.bottom_block.modules():
+            if m.__class__.__name__.startswith('Dropout'):
+                m.train()
+                #print('layer CONV {} is in train'.format(m.__class__.__name__))
+        for m in self.decoder.modules():
+            if m.__class__.__name__.startswith('Dropout'):
+                m.train()
+                #print('layer CONV {} is in train'.format(m.__class__.__name__))
+
 
 class UNet2D(UNet):
     def __init__(self, *args, **user_kwargs):
